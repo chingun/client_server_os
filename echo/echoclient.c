@@ -1,13 +1,18 @@
-#include <string.h>
-#include <unistd.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <netdb.h>
-#include <getopt.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/types.h>
+#include <string.h>         //
+#include <unistd.h>         //
+#include <errno.h>          //
+
+#include <stdlib.h>         // Standard Library
+#include <stdio.h>          // Standard Input Output
+
+#include <netdb.h>          //
+#include <getopt.h>         //
+
+#include <sys/socket.h>     // Definitions of socket functions like send recv
+#include <sys/types.h>      // Definitions of socket functions like send recv
+
+#include <netinet/in.h>     // Contains structures to store address information
+                            // Used to connect to other sockets
 
 /* A buffer large enough to contain the longest allowed string */
 #define BUFSIZE 520
@@ -82,5 +87,31 @@ int main(int argc, char **argv)
     }
 
     /* Socket Code Here */
+    int network_socket; 
+    network_socket = socket(AF_INET, SOCK_STREAM, 0); //This is how a TCP network socket is created
 
+    // Specifiy an address for the socket
+    struct sockaddr_in server_address;
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = portno; //
+    server_address.sin_addr.s_addr = INADDR_ANY; //Data of the address
+    int connection_status = connect(network_socket, (struct sockaddr *) &server_address, sizeof(server_address));
+    
+    // Check for error with the connection
+    if(connection_status == -1){
+        printf("There was an error making a connection to the remote socket\n\n");
+    }
+
+    // Receive data from the server
+    char server_response[BUFSIZE];
+    send(network_socket, message, 16, 0);
+    // printf("Message sent: %s\n", message);
+    recv(network_socket, &server_response, 16, 0);
+    // print out the server's response
+    printf("%s", server_response);
+    // Finally close the socket
+    close(network_socket);
+    return 0;
 }
+
+
