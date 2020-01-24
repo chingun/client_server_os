@@ -17,6 +17,11 @@
 /* A buffer large enough to contain the longest allowed string */
 #define BUFSIZE 520
 
+/* Personal variable names */
+#define LOCALHOST "127.0.0.1"
+#define MSG_BUFFER 16               //neither the message to the server nor the response will be longer than 15 bytes
+/* End */
+
 #define USAGE                                                                       \
     "usage:\n"                                                                      \
     "  echoclient [options]\n"                                                      \
@@ -87,30 +92,82 @@ int main(int argc, char **argv)
     }
 
     /* Socket Code Here */
-    int network_socket; 
-    network_socket = socket(AF_INET, SOCK_STREAM, 0); //This is how a TCP network socket is created
+    int sock;                        /* Socket descriptor */
+    char echoBuffer[BUFSIZE];     /* Buffer for echo string */
+    int numAddrs;
+    int sendMsgSize;
+    int recvMsgSize;
+    // int yes = 1;
+    char portno_char[6];
+    // unsigned int echoStringLen;      /* Length of string to echo */
+    // int bytesRcvd, totalBytesRcvd;   /* Bytes read in single recv() 
+                                        // and total bytes read */
 
-    // Specifiy an address for the socket
-    struct sockaddr_in server_address;
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = portno; //
-    server_address.sin_addr.s_addr = INADDR_ANY; //Data of the address
-    int connection_status = connect(network_socket, (struct sockaddr *) &server_address, sizeof(server_address));
-    
-    // Check for error with the connection
-    if(connection_status == -1){
-        printf("There was an error making a connection to the remote socket\n\n");
+    // #1 Create Socket: Has to be more elegant with getaddrinfo to account for Bonnie cases
+    struct addrinfo hints, *serverinfo, *addr;
+    memset(&hints, 0, sizeof hints);    // HINTS: narrows down what type of address the client is looking for
+    hints.ai_family = AF_INET;          // This field specifies the desired address family for the
+                                        // returned addresses.  Valid values for this field include
+                                        // AF_INET and AF_INET6.  The value AF_UNSPEC indicates that
+                                        // getaddrinfo() should return socket addresses for any
+                                        // address family (either IPv4 or IPv6, for example) that
+                                        // can be used with node and service.
+    hints.ai_socktype = SOCK_STREAM;    // This field specifies the preferred socket type, for exam‐
+                                        // ple SOCK_STREAM or SOCK_DGRAM.  Specifying 0 in this
+                                        // field indicates that socket addresses of any type can behostname
+                                        // returned by getaddrinfo().
+
+    sprintf(portno_char, "%d", portno);     // Convert portnum for getaddrinfo.
+
+    if(strcmp(hostname, "localhost")==0){
+        hostname = LOCALHOST;
     }
 
-    // Receive data from the server
-    char server_response[BUFSIZE];
-    send(network_socket, message, 16, 0);
-    // printf("Message sent: %s\n", message);
-    recv(network_socket, &server_response, 16, 0);
-    // print out the server's response
-    printf("%s", server_response);
-    // Finally close the socket
-    close(network_socket);
+    if ((numAddrs = getaddrinfo(hostname, portno_char, &hints, &serverinfo)) != 0) {
+        fprintf(stderr, "The client failed to get address info with issue: %i\n", numAddrs);
+        exit(1);
+    }
+
+    // loop through and connect to the first
+    for(addr = serverinfo; addr != NULL; addr = addr->ai_next) {
+        // #1 here created socket successfully  
+        if ((sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol)) == -1){
+            fprintf(stderr, "Failed to generate correct socket, moving to next socket found");
+            continue;
+        }
+        // #2 Connect To Socket
+        if (connect(sock, addr->ai_addr, addr->ai_addrlen) == -1){
+            close(sock);
+            fprintf(stderr, "Failed to connect to socket moving to next socket");
+            continue;
+        }
+        break;
+    }
+    // Might not be useful in client: setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+    freeaddrinfo(serverinfo); // otherwise ==14651==ERROR: LeakSanitizer: detected memory leaks
+
+    // #3 Send to Server
+    sendMsgSize = send(sock, message, MSG_BUFFER - 1, 0);
+    if (sendMsgSize != MSG_BUFFER - 1){
+        fprintf(stderr, "send() sent a different number of bytes than expected");
+        exit(1);
+    }
+
+    // #4 Recieve from Server
+    /* Receive up to the buffer size (minus 1 to leave space for
+    a null terminator) bytes from the sender */
+    recvMsgSize = recv(sock, echoBuffer, MSG_BUFFER - 1, 0);
+    if (recvMsgSize < 0){
+        fprintf(stderr, "recv() failed or connection closed prematurely");
+        exit(1);
+    }
+
+    echoBuffer[recvMsgSize] = '\0';
+    // totalBytesRcvd += bytesRcvd;   /* Keep tally of total bytes */
+    // echoBuffer[bytesRcvd] = '\0';  /* Terminate the string! */
+    // #5 Print the message
+    fprintf(stdout, "%s", echoBuffer);      /* Print the echo buffer */
+    
     return 0;
 }
 
