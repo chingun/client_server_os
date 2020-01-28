@@ -10,6 +10,8 @@
 #include <sys/types.h>
 
 #define BUFSIZE 520
+#define LOCALHOST "127.0.0.1"
+
 
 #define USAGE                                                \
     "usage:\n"                                               \
@@ -69,5 +71,25 @@ int main(int argc, char **argv)
     }
 
     /* Socket Code Here */
+    if (strcmp(hostname,"localhost")==0){
+        hostname = LOCALHOST;
+    }
+    
+    int servSock;
+    int clntSock;
+    // struct sockaddr_in echoServAddr; /* Local address */
+    struct sockaddr_in echoClntAddr; /* Client address */         
+    // char client_msg[16];
+    int numAddrs;
+    unsigned int clntLen;            /* Length of client address data structure */
+    int yes = 1;
+    char* hostname = LOCALHOST;
+    char portno_char[6];
+    sprintf(portno_char, "%d", portno);     // Convert portnum for getaddrinfo.
+    struct addrinfo hints, *serverinfo, *addr;
+    memset(&hints, 0, sizeof hints);    // HINTS: narrows down what type of address the client is looking for
+
+
+
 
 }
